@@ -2,7 +2,7 @@
 name = "rupture-engine"
 version = "0.1.0"
 edition = "2021"
-authors = ["Duston Moore <duston@example.com>"]
+authors = ["Duston Moore <dhwcmoore@gmail.com>"]
 description = "Deterministic rupture detection engine for financial time series using long-memory strain accumulation, adaptive capacity, and robust state-machine confirmation."
 license = "MIT"
 readme = "README.md"
