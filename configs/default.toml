@@ -1,0 +1,143 @@
+# Rupture Engine default configuration
+# Deterministic state machine with long-memory strain (power-law kernel),
+# robust normalisation (median + MAD), adaptive capacity (rolling quantile),
+# and rupture confirmation using m-of-k over the next k bars.
+
+[io]
+# CSV columns expected: timestamp, open, high, low, close, volume
+timestamp_column = "timestamp"
+open_column      = "open"
+high_column      = "high"
+low_column       = "low"
+close_column     = "close"
+volume_column    = "volume"
+
+# Timestamp parsing strategy. If your CSV timestamps are ISO 8601, set
+# parse_timestamps = true. If you want to keep timestamps as opaque strings,
+# set parse_timestamps = false.
+parse_timestamps = false
+
+# Drop rows with any missing required numeric fields (close, volume at minimum).
+drop_invalid_rows = true
+
+# If true, sort by timestamp (or by row order if parse_timestamps = false).
+sort_by_timestamp = false
+
+[preprocess]
+# Basic numeric sanity checks.
+require_positive_close = true
+allow_zero_volume      = true
+
+# Minimum number of rows required. This is checked against the largest window below.
+min_rows = 600
+
+[numerics]
+# Small constant to prevent division by zero.
+eps = 1.0e-12
+
+# Clipping for residual channels (winsorisation).
+# This prevents single outliers from dominating strain.
+clip_residuals = true
+residual_clip_max = 25.0
+
+[windows]
+# Rolling window for robust scales of returns and acceleration, and for volume median.
+# Daily data: 20 is roughly one trading month.
+robust_scale_n = 20
+
+# Memory window length for power-law accumulation (K).
+# Daily data: 200 is roughly 10 months of trading days.
+memory_k = 200
+
+# Capacity window length for rolling quantile of strain (L).
+# Daily data: 500 is roughly 2 years of trading days.
+capacity_l = 500
+
+[features]
+# Use log returns for price movement.
+use_log_returns = true
+
+[robust]
+# Robust scale for returns and acceleration uses:
+#   scale = 1.4826 * MAD + eps
+mad_scale_factor = 1.4826
+
+# Robust baseline for volume uses rolling median.
+# v_t = V_t / (median(V_window) + eps)
+use_volume_median = true
+
+[residuals]
+# Residual channels:
+#   r_vol = max(0, u - theta_vol)
+#   r_liq = max(0, u / (v + eps) - theta_liq)
+#   r_acc = max(0, a - theta_acc)
+#
+# u = |R_t| / robust_scale_returns
+# v = V_t / median_volume
+# a = |A_t| / robust_scale_accel
+#
+# Thresholds are dimensionless because of robust normalisation.
+theta_vol = 1.25
+theta_liq = 1.10
+theta_acc = 1.25
+
+[combine]
+# Soft-max combiner for residual channels using log-sum-exp:
+#   r = tau * log( exp(r_vol/tau) + exp(r_liq/tau) + exp(r_acc/tau) )
+#
+# Smaller tau behaves closer to max(). Larger tau behaves closer to sum().
+tau = 0.35
+
+[memory]
+# Power-law memory weights:
+#   w_k proportional to k^(-alpha), normalised over k = 1..K
+#
+# alpha in (0,1). Lower alpha means longer memory tail.
+alpha = 0.65
+
+[capacity]
+# Adaptive capacity is a rolling quantile of S_t over the past L points:
+#   E_t = quantile_q( S_{t-L..t} )
+#
+# Larger q gives higher tolerance, fewer rupture events.
+q = 0.95
+
+# Optional smoothing of capacity for stability:
+#   E_t = (1 - lambda) * E_{t-1} + lambda * E_raw
+smooth = true
+lambda = 0.05
+
+# Minimum capacity floor.
+e_min = 1.0e-6
+
+[state_machine]
+# rho_t = S_t / (E_t + eps)
+# State thresholds (dimensionless ratio rho).
+rho_stressed = 0.60
+rho_critical = 0.85
+
+# Rupture threshold is always rho >= 1.0 (candidate crossing).
+rho_rupture = 1.00
+
+# Confirmation window parameters.
+# k must be 1, 2, or 3.
+# m must satisfy 1 <= m <= k.
+confirm_k = 3
+confirm_m = 2
+
+# Post-rupture recovery rule:
+# After confirmed rupture, enter Recovery when rho falls below rho_critical for
+# recovery_hold bars (consecutive).
+enable_recovery = true
+recovery_hold = 2
+
+[outputs]
+# Output files are written under the CLI-selected output directory.
+write_csv_timeseries = true
+csv_timeseries_name  = "rupture_timeseries.csv"
+
+write_json_events = true
+json_events_name  = "rupture_events.json"
+
+write_json_config_snapshot = true
+json_config_snapshot_name  = "config_used.json"

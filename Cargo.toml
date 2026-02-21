@@ -1,0 +1,28 @@
+[package]
+name = "rupture-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Duston Moore <duston@example.com>"]
+description = "Deterministic rupture detection engine for financial time series using long-memory strain accumulation, adaptive capacity, and robust state-machine confirmation."
+license = "MIT"
+readme = "README.md"
+keywords = ["finance", "time-series", "rupture-detection", "robust-statistics"]
+categories = ["science", "command-line-utilities"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+csv = "1"
+toml = "0.8"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+[[bin]]
+name = "rupture-engine"
+path = "src/main.rs"

@@ -1,0 +1,16 @@
+# Rust
+/target/
+
+# Generated outputs
+/output/
+**/output/
+
+# Local datasets (do not publish)
+/data/*.csv
+/data/**/*.csv
+
+# OS/editor noise
+.DS_Store
+*.swp
+.vscode/
+.idea/

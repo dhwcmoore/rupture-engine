@@ -1,0 +1,69 @@
+# Preset: daily OHLCV bars (e.g. equities, ETFs).
+# Adjust residual thresholds per asset/regime once basic validation is complete.
+
+[io]
+timestamp_column = "timestamp"
+open_column      = "open"
+high_column      = "high"
+low_column       = "low"
+close_column     = "close"
+volume_column    = "volume"
+parse_timestamps = false
+drop_invalid_rows = true
+sort_by_timestamp = true
+
+[preprocess]
+require_positive_close = true
+allow_zero_volume      = true
+min_rows = 600
+
+[numerics]
+eps = 1.0e-12
+clip_residuals = true
+residual_clip_max = 25.0
+
+[windows]
+robust_scale_n = 20
+memory_k = 200
+capacity_l = 500
+
+[features]
+use_log_returns = true
+
+[robust]
+mad_scale_factor = 1.4826
+use_volume_median = true
+
+[residuals]
+theta_vol = 2.0
+theta_liq = 1.75
+theta_acc = 2.0
+
+[combine]
+tau = 0.35
+
+[memory]
+alpha = 0.65
+
+[capacity]
+q = 0.95
+smooth = true
+lambda = 0.05
+e_min = 1.0e-6
+
+[state_machine]
+rho_stressed = 0.90
+rho_critical = 1.05
+rho_rupture = 1.25
+confirm_k = 3
+confirm_m = 2
+enable_recovery = true
+recovery_hold = 2
+
+[outputs]
+write_csv_timeseries = true
+csv_timeseries_name  = "rupture_timeseries.csv"
+write_json_events = true
+json_events_name  = "rupture_events.json"
+write_json_config_snapshot = true
+json_config_snapshot_name  = "config_used.json"
