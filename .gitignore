@@ -1,4 +1,4 @@
-# Rust
+# Rust build artifacts
 /target/
 
 # Generated outputs
@@ -9,8 +9,21 @@
 /data/*.csv
 /data/**/*.csv
 
+# Python bytecode (for plotting script)
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+
 # OS/editor noise
 .DS_Store
+Thumbs.db
 *.swp
+*.swo
 .vscode/
 .idea/
