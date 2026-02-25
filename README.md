@@ -1,5 +1,3 @@
----
-
 # Rupture Engine
 
 A deterministic Rust CLI for modelling stress accumulation and regime transitions in time-indexed financial data.
@@ -228,5 +226,3 @@ This repository demonstrates a deterministic regime detection architecture, not 
 ## License
 
 MIT
-
----
