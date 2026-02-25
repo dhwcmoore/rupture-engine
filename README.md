@@ -1,14 +1,18 @@
+---
+
 # Rupture Engine
 
-A deterministic Rust CLI for detecting stress build-up and regime transitions in financial time series.
+A deterministic Rust CLI for modelling stress accumulation and regime transitions in time-indexed financial data.
 
-The engine ingests OHLCV bar data and produces:
+The engine treats regime detection as a state transition problem over a fully specified data pipeline. All transformations are explicit, parameterised, and reproducible.
 
-- A per-bar stress time series (CSV)
-- A structured rupture event log (JSON)
-- A configuration snapshot for full reproducibility
+Given OHLCV bar data, the engine produces:
 
-This project demonstrates production-style modelling in Rust: robust statistics, adaptive thresholds, deterministic state transitions, and test coverage.
+* A per-bar stress time series (CSV)
+* A structured rupture event log (JSON)
+* A configuration snapshot for full reproducibility
+
+No stochastic components are used. All outputs are deterministic functions of input data and configuration.
 
 ---
 
@@ -18,146 +22,151 @@ This project demonstrates production-style modelling in Rust: robust statistics,
 
 ---
 
-## What this project demonstrates
+## Design principles
 
-- Rolling robust statistics (median, MAD, quantiles)
-- Multi-channel feature engineering
-- Weighted rolling convolution (long-memory accumulation)
-- Adaptive thresholding via rolling quantiles
-- Deterministic finite-state machine with m-of-k confirmation logic
-- CLI argument parsing and config-driven execution
-- Structured output schemas (CSV + JSON)
-- Unit and integration tests in Rust
+* Deterministic transformations only
+* Explicit intermediate representations
+* Config-driven parameterisation
+* Invariant-preserving state transitions
+* Structured, machine-readable outputs
 
-This is a reproducible command-line data pipeline.
+The system is organised as a compositional pipeline whose stages are independently testable.
 
 ---
 
 ## System architecture
 
-    OHLCV CSV
-      |
-      v
-    Feature layer (returns, acceleration, volume)
-      |
-      v
-    Residual layer (r_vol, r_liq, r_acc)
-      |
-      v
-    Memory kernel (weighted accumulation)
-      |
-      v
-    Adaptive capacity (rolling quantile)
-      |
-      v
-    State machine (Stable → … → Confirmed/Recovery)
-      |
-      v
-    CSV time series + JSON event log
+```id="xw8k27"
+OHLCV CSV
+   ↓
+Feature extraction
+   ↓
+Residual channels
+   ↓
+Memory kernel (strain)
+   ↓
+Adaptive capacity
+   ↓
+Finite-state machine
+   ↓
+CSV time series + JSON event log
+```
+
+Each stage is a pure transformation over time-indexed data.
 
 ---
 
-## Pipeline overview
-
-### 1) Feature extraction
+## 1. Feature layer
 
 From OHLCV bars:
 
-- Log returns
-- Return acceleration
-- Volume
+* Log returns
+* Return acceleration
+* Volume
 
 Each feature is robustly normalised using rolling median and MAD.
 
-### 2) Residual channels
+All rolling statistics are explicitly implemented and covered by tests.
 
-Excess activity beyond configurable thresholds:
+---
 
-    r_vol = max(0, u - θ_vol)
-    r_liq = max(0, u / (v + ε) - θ_liq)
-    r_acc = max(0, a - θ_acc)
+## 2. Residual channels
 
-Channels are combined using a numerically stable soft-max.
+Thresholded excess activity is defined per channel:
 
-### 3) Strain accumulation
+```id="3sfl29"
+r_vol = max(0, u - θ_vol)
+r_liq = max(0, u / (v + ε) - θ_liq)
+r_acc = max(0, a - θ_acc)
+```
 
-Residuals are accumulated using a weighted rolling window, producing a strain signal that captures persistent stress.
+Residual channels are combined using a numerically stable soft-max.
 
-### 4) Adaptive capacity
+All thresholds are defined in a TOML configuration file and persisted per run.
 
-Capacity is estimated as a rolling quantile of historical strain with optional smoothing. This allows thresholds to adapt to changing volatility regimes.
+---
 
-### 5) Deterministic state machine
+## 3. Strain accumulation (memory kernel)
 
-    rho = strain / capacity
+Residuals are accumulated via a weighted rolling convolution.
 
-drives transitions through:
+This produces a strain signal representing persistent stress rather than isolated deviations.
 
-- Stable
-- Stressed
-- Critical
-- Candidate
-- Confirmed
-- Recovery
+The kernel window and weighting exponent are configurable and deterministic.
 
-Confirmed ruptures require m-of-k confirmation logic.
+---
+
+## 4. Adaptive capacity
+
+Capacity is defined as a rolling quantile of historical strain with optional smoothing.
+
+```id="k8s2mz"
+rho = strain / capacity
+```
+
+The ratio `rho` is the sole driver of regime transitions.
+
+Capacity adapts to regime scale while remaining an explicit, observable signal.
+
+---
+
+## 5. Finite-state machine
+
+Regime classification is implemented as an explicit finite-state machine:
+
+* Stable
+* Stressed
+* Critical
+* Candidate
+* Confirmed
+* Recovery
+
+Transitions are deterministic functions of `rho` and confirmation logic.
+
+Confirmed ruptures require m-of-k confirmation over a configurable window.
+
+All state transitions are encoded explicitly and tested.
 
 ---
 
 ## Example: SPY daily (2005–2026)
 
-Applied to 5,000+ daily SPY bars:
+Applied to approximately 5,000 daily bars:
 
-- Stable: ~74%
-- Stressed: ~18%
-- Critical: ~2%
-- Confirmed rupture episodes: 13
+* Stable: ~74%
+* Stressed: ~18%
+* Critical: ~2%
+* Confirmed rupture episodes: 13
 
-Major stress regimes identified:
-
-- 2007–08 global selloff
-- 2011 US downgrade / Euro crisis
-- 2015 China devaluation shock
-- 2016 Brexit
-- 2018 volatility spike
-- 2020 COVID acceleration
+These correspond to major volatility regimes.
+Results are parameter-dependent but reproducible.
 
 ---
 
-## Quick start
+## Build
 
-Build:
-
-    cargo build --release
-
-Run:
-
-    ./target/release/rupture-engine \
-      --input data/spy_daily.csv \
-      --config configs/default.toml \
-      --output-dir output/
-
-Or:
-
-    bash examples/run_spy_2008.sh /path/to/spy_daily.csv
-
-Plot:
-
-    python scripts/plot_results.py output/spy_2008/rupture_timeseries.csv
+```id="3qk2lg"
+cargo build --release
+```
 
 ---
 
-## Configuration
+## Run
 
-All parameters are defined in a single TOML file, including:
+```id="t91zab"
+./target/release/rupture-engine \
+  --input data/spy_daily.csv \
+  --config configs/default.toml \
+  --output-dir output/
+```
 
-- Residual thresholds
-- Memory window and exponent
-- Capacity quantile
-- State transition levels
-- Confirmation window (k, m)
+Each run writes:
 
-Each run writes config_used.json for reproducibility.
+* `rupture_timeseries.csv`
+* `rupture_events.json`
+* `config_used.json`
+
+The configuration snapshot ensures that outputs are reproducible.
 
 ---
 
@@ -165,49 +174,59 @@ Each run writes config_used.json for reproducibility.
 
 ### rupture_timeseries.csv
 
-Per-bar fields include:
+Per-bar structured fields:
 
-- timestamp
-- residual channels
-- strain
-- capacity
-- rho
-- state
-- candidate flag
-- confirmed flag
+* timestamp
+* residual channels
+* strain
+* capacity
+* rho
+* state
+* candidate flag
+* confirmed flag
 
 ### rupture_events.json
 
 Structured event records:
 
-- candidate timestamp
-- confirmation timestamp
-- peak rho
-- confirmation parameters
+* candidate timestamp
+* confirmation timestamp
+* peak rho
+* confirmation parameters
+
+All outputs are machine-readable and schema-consistent.
 
 ---
 
 ## Testing
 
-    cargo test
+```id="qun7m2"
+cargo test
+```
 
-Includes:
+Test coverage includes:
 
-- Rolling statistic tests
-- Memory kernel tests
-- State machine transition tests
-- CLI smoke test
+* Rolling statistic correctness
+* Memory kernel behaviour
+* State transition invariants
+* CLI integration
 
 ---
 
 ## Limitations
 
-- Single instrument
-- Deterministic and parameter-sensitive
-- Designed for daily or moderate-frequency data
+* Single-instrument design
+* Parameter-sensitive thresholds
+* Deterministic model (not probabilistic)
+* No execution or cost modelling
+* Not a trading system
+
+This repository demonstrates a deterministic regime detection architecture, not an investment strategy.
 
 ---
 
 ## License
 
 MIT
+
+---
